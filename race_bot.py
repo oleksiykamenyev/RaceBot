@@ -5,12 +5,16 @@ import io
 import operator
 
 from datetime import datetime
+
+import discord
+import yaml
+
 from discord.ext import commands
 
 __author__ = '4shockblast'
 
 
-class Race(object):
+class Race(commands.Cog):
     """Race object
 
     Provides functionality to create, start, end races as well as functionality
@@ -52,15 +56,15 @@ class Race(object):
 
         Only mods can run this command
         """
-        if self.is_mod(ctx.message.author):
+        if self.is_mod(ctx.author):
             if self._race_created:
-                await bot.say('Race already created, please end the current '
-                              'race to create a new one.')
+                await ctx.send('Race already created, please end the current '
+                               'race to create a new one.')
             elif self._race_started:
-                await bot.say('Race already started, please end the current '
-                              'race to create a new one.')
+                await ctx.send('Race already started, please end the current '
+                               'race to create a new one.')
             else:
-                await bot.say('Creating race.')
+                await ctx.send('Creating race.')
                 self._time_created = datetime.utcnow()
                 self._race_created = True
                 self._race_file_name = 'race_{}.txt'.format(
@@ -69,8 +73,8 @@ class Race(object):
                 self._num_racers = 0
                 self._num_ready = 0
         else:
-            await bot.say('Only members with moderator permissions can create '
-                          'races.')
+            await ctx.send('Only members with moderator permissions can create '
+                           'races.')
 
     @commands.command(pass_context=True)
     async def startrace(self, ctx):
@@ -80,42 +84,40 @@ class Race(object):
         the race is set up properly.
         """
         mention_role = '@everyone'
-        for role in ctx.message.server.roles:
+        for role in ctx.message.guild.roles:
             # Mention only racers on start race if such a role exists
             if str(role) == 'racer':
                 mention_role = '{}'.format(role.mention)
-        if self.is_mod(ctx.message.author):
+        if self.is_mod(ctx.author):
             if self._race_started:
-                await bot.say('Race currently started, please end it before '
-                              'starting a new one.')
+                await ctx.send('Race currently started, please end it before '
+                               'starting a new one.')
             elif not self._race_created:
-                await bot.say('No race has been created!')
+                await ctx.send('No race has been created!')
             elif self._num_racers is None or self._num_racers == 0:
-                await bot.say('There are no racers in the race!')
+                await ctx.send('There are no racers in the race!')
             elif self._num_ready is None or self._num_ready == 0:
-                await bot.say('There is no one ready in the race!')
-            elif self._num_racers == 1:
-                await bot.say("You can't have a race with one person.")
+                await ctx.send('There is no one ready in the race!')
             elif self._num_racers != self._num_ready:
-                await bot.say('Not everyone is ready yet!')
+                await ctx.send('Not everyone is ready yet!')
             elif self._race_goal is None:
-                await bot.say('Race goal is not set yet!')
+                await ctx.send('Race goal is not set yet!')
             elif self._race_game is None:
-                await bot.say('Race game is not set yet!')
+                await ctx.send('Race game is not set yet!')
             else:
-                await bot.say('Starting race...')
+                await ctx.send('Starting race...')
                 await asyncio.sleep(1)
-                await bot.say('5')
+                await ctx.send('5')
                 await asyncio.sleep(1)
-                await bot.say('4')
+                await ctx.send('4')
                 await asyncio.sleep(1)
-                await bot.say('3')
+                await ctx.send('3')
                 await asyncio.sleep(1)
-                await bot.say('2')
+                await ctx.send('2')
                 await asyncio.sleep(1)
-                await bot.say('1')
+                await ctx.send('1')
                 await asyncio.sleep(1)
-                await bot.say('{}, start!'.format(mention_role))
+                await ctx.send('{}, start!'.format(mention_role))
 
                 self._time_started = datetime.utcnow()
                 self._race_started = True
@@ -134,8 +136,8 @@ class Race(object):
 
                 self._num_finished = 0
         else:
-            await bot.say('Only members with moderator permissions can start '
-                          'races.')
+            await ctx.send('Only members with moderator permissions can start '
+                           'races.')
 
     @commands.command(pass_context=True)
     async def endrace(self, ctx):
@@ -147,13 +149,13 @@ class Race(object):
         all players completed the race (for instance, a comment was added),
         this will also print out the results.
         """
-        if self.is_mod(ctx.message.author):
+        if self.is_mod(ctx.author):
             if not self._race_created:
-                await bot.say('No race has been created!')
+                await ctx.send('No race has been created!')
             else:
-                await bot.say('The race has ended!')
+                await ctx.send('The race has ended!')
                 if self._race_started and not self._results_printed:
-                    await self.output_results(True)
+                    await self.output_results(ctx, True)
 
                 self._race_created = False
                 self._time_created = None
@@ -169,8 +171,8 @@ class Race(object):
                 self._num_racers = None
                 self._num_ready = None
         else:
-            await bot.say('Only members with moderator permissions can end '
-                          'races.')
+            await ctx.send('Only members with moderator permissions can end '
+                           'races.')
 
     @commands.command(pass_context=True)
     async def setgoal(self, ctx, *, _goal: str):
@@ -178,23 +180,23 @@ class Race(object):
 
         Only mods can run this command.
         """
-        if self.is_mod(ctx.message.author):
+        if self.is_mod(ctx.author):
             if self._race_created:
                 self._race_goal = _goal
-                await bot.say('Goal set.')
+                await ctx.send('Goal set.')
             else:
-                await bot.say('No race currently created!')
+                await ctx.send('No race currently created!')
         else:
-            await bot.say('Only members with moderator permissions can set '
-                          'goals for races.')
+            await ctx.send('Only members with moderator permissions can set '
+                           'goals for races.')
 
-    @commands.command()
-    async def goal(self):
+    @commands.command(pass_context=True)
+    async def goal(self, ctx):
         """Returns the goal for the race."""
         if self._race_created:
-            await bot.say('Race goal: {}'.format(self._race_goal))
+            await ctx.send('Race goal: {}'.format(self._race_goal))
         else:
-            await bot.say('No race currently created!')
+            await ctx.send('No race currently created!')
 
     @commands.command(pass_context=True)
     async def setgame(self, ctx, *, _game: str):
@@ -202,23 +204,23 @@ class Race(object):
 
         Only mods can run this command.
         """
-        if self.is_mod(ctx.message.author):
+        if self.is_mod(ctx.author):
             if self._race_created:
                 self._race_game = _game
-                await bot.say('Game set.')
+                await ctx.send('Game set.')
             else:
-                await bot.say('No race currently created!')
+                await ctx.send('No race currently created!')
         else:
-            await bot.say('Only members with moderator permissions can set '
-                          'games for races.')
+            await ctx.send('Only members with moderator permissions can set '
+                           'games for races.')
 
-    @commands.command()
-    async def game(self):
+    @commands.command(pass_context=True)
+    async def game(self, ctx):
         """Returns the game for the race."""
         if self._race_created:
-            await bot.say('Race game: {}'.format(self._race_game))
+            await ctx.send('Race game: {}'.format(self._race_game))
         else:
-            await bot.say('No race currently created!')
+            await ctx.send('No race currently created!')
 
     @commands.command(pass_context=True)
     async def join(self, ctx):
@@ -228,10 +230,10 @@ class Race(object):
         the player start time that is set is the join time not the general
         start time.
         """
-        racer = ctx.message.author
+        racer = ctx.author
         if self._race_created:
             if racer in self._racer_dict:
-                await bot.say('<@{}>, you already joined the race!'.format(
+                await ctx.send('<@{}>, you already joined the race!'.format(
                     racer.id
                 ))
             else:
@@ -242,11 +244,11 @@ class Race(object):
                     self._num_ready += 1
                 self._racer_dict[racer] = None
                 self._num_racers += 1
-                await bot.say('{} has joined the race!'.format(
+                await ctx.send('{} has joined the race!'.format(
                     self.trim_member_name('{}'.format(racer))
                 ))
         else:
-            await bot.say('No race currently created!')
+            await ctx.send('No race currently created!')
 
     @commands.command(pass_context=True)
     async def unjoin(self, ctx):
@@ -254,11 +256,11 @@ class Race(object):
 
         Only possible if race is not running.
         """
-        racer = ctx.message.author
+        racer = ctx.author
         if self._race_started:
-            await bot.say("<@{}>, you can't !unjoin a race that is "
+            await ctx.send("<@{}>, you can't !unjoin a race that is "
                           "running.".format(racer.id))
-            await bot.say('Please !quit the race instead.')
+            await ctx.send('Please !quit the race instead.')
         elif self._race_created:
             if racer in self._racer_dict:
                 self._racer_dict.pop(racer, None)
@@ -266,14 +268,14 @@ class Race(object):
                 if racer in self._racer_ready_dict:
                     self._racer_ready_dict.pop(racer, None)
                     self._num_ready -= 1
-                await bot.say('{} has left the race!'.format(
+                await ctx.send('{} has left the race!'.format(
                     self.trim_member_name('{}'.format(racer))
                 ))
             else:
-                await bot.say("<@{}>, you can't leave a race you didn't "
-                              "join.".format(racer.id))
+                await ctx.send("<@{}>, you can't leave a race you didn't "
+                               "join.".format(racer.id))
         else:
-            await bot.say('No race currently running!')
+            await ctx.send('No race currently running!')
 
     @commands.command(pass_context=True)
     async def ready(self, ctx):
@@ -282,26 +284,35 @@ class Race(object):
         Only possible if race is created and not running, otherwise ready
         command is not needed.
         """
-        racer = ctx.message.author
+        racer = ctx.author
         if self._race_started:
-            await bot.say("You don't need to !ready after the race has "
-                          "started.")
+            if racer in self._racer_ready_dict:
+                await ctx.send('<@{}>, you already set yourself as '
+                               'ready!'.format(racer.id))
+            else:
+                await ctx.send("You don't need to !ready after the race has "
+                               "started.")
+                if racer not in self._racer_dict:
+                    await ctx.send("Feel free to join the currently running "
+                                   "race! Don't worry, your timer will be "
+                                   "started from whenever you send the !join "
+                                   "command.")
         elif self._race_created:
             if racer in self._racer_dict:
                 if racer in self._racer_ready_dict:
-                    await bot.say('<@{}>, you already set yourself as '
-                                  'ready!'.format(racer.id))
+                    await ctx.send('<@{}>, you already set yourself as '
+                                   'ready!'.format(racer.id))
                 else:
                     self._racer_ready_dict[racer] = None
                     self._num_ready += 1
-                    await bot.say('{} is ready!'.format(
+                    await ctx.send('{} is ready!'.format(
                         self.trim_member_name('{}'.format(racer))
                     ))
             else:
-                await bot.say('<@{}>, please join the race before setting '
-                              'yourself as ready.'.format(racer.id))
+                await ctx.send('<@{}>, please join the race before setting '
+                               'yourself as ready.'.format(racer.id))
         else:
-            await bot.say('No race currently created!')
+            await ctx.send('No race currently created!')
 
     @commands.command(pass_context=True)
     async def unready(self, ctx):
@@ -309,27 +320,27 @@ class Race(object):
 
         Only possible if race is created and not started.
         """
-        racer = ctx.message.author
+        racer = ctx.author
         if self._race_started:
-            await bot.say("<@{}>, the race is already running, it's a bit too "
-                          "late to unready.".format(racer.id))
+            await ctx.send("<@{}>, the race is already running, it's a bit too "
+                           "late to unready.".format(racer.id))
         elif self._race_created:
             if racer in self._racer_dict:
                 if racer in self._racer_ready_dict:
                     self._racer_ready_dict.pop(racer, None)
                     self._num_ready -= 1
-                    await bot.say('{} is no longer ready!'.format(
+                    await ctx.send('{} is no longer ready!'.format(
                         self.trim_member_name('{}'.format(racer))
                     ))
                 else:
-                    await bot.say('<@{}>, you did not set yourself as ready '
-                                  'yet!'.format(racer.id))
+                    await ctx.send('<@{}>, you did not set yourself as ready '
+                                   'yet!'.format(racer.id))
             else:
-                await bot.say('<@{}>, you did not join the race yet.'.format(
+                await ctx.send('<@{}>, you did not join the race yet.'.format(
                     racer.id
                 ))
         else:
-            await bot.say('No race currently created!')
+            await ctx.send('No race currently created!')
 
     @commands.command(pass_context=True)
     async def quit(self, ctx):
@@ -343,32 +354,32 @@ class Race(object):
 
         If race is created, behaves the same as unjoin.
         """
-        racer = ctx.message.author
+        racer = ctx.author
         if self._race_started:
             if racer in self._racer_dict:
                 if self._racer_dict[racer] is None:
                     self._racer_dict[racer] = 'Forfeited'
                     self._racer_comments_dict[racer] = ''
-                    await bot.say('{} has quit the race!'.format(
+                    await ctx.send('{} has quit the race!'.format(
                         self.trim_member_name('{}'.format(racer))
                     ))
 
                     self._num_finished += 1
                     if self._num_finished == self._num_racers:
-                        await bot.say('Everyone has completed the race!')
-                        await self.output_results(True)
+                        await ctx.send('Everyone has completed the race!')
+                        await self.output_results(ctx, True)
                         self._results_printed = True
                 elif self._racer_dict[racer] == 'Forfeited':
-                    await bot.say('<@{}>, you already quit the race.'.format(
+                    await ctx.send('<@{}>, you already quit the race.'.format(
                         racer.id
                     ))
                 else:
-                    await bot.say('<@{}>, you have already completed the '
-                                  'race.'.format(racer.id))
-                    await bot.say('Please !undone if you want to undo your '
-                                  'previous race completion.')
+                    await ctx.send('<@{}>, you have already completed the '
+                                   'race.'.format(racer.id))
+                    await ctx.send('Please !undone if you want to undo your '
+                                   'previous race completion.')
             else:
-                await bot.say("<@{}>, you didn't join the race.".format(
+                await ctx.send("<@{}>, you didn't join the race.".format(
                     racer.id
                 ))
         elif self._race_created:
@@ -378,14 +389,14 @@ class Race(object):
                 if racer in self._racer_ready_dict:
                     self._racer_ready_dict.pop(racer, None)
                     self._num_ready -= 1
-                await bot.say('{} has left the race!'.format(
+                await ctx.send('{} has left the race!'.format(
                     self.trim_member_name('{}'.format(racer))
                 ))
             else:
-                await bot.say("<@{}>, you can't leave a race you didn't "
-                              "join.".format(racer.id))
+                await ctx.send("<@{}>, you can't leave a race you didn't "
+                               "join.".format(racer.id))
         else:
-            await bot.say('No race has been created!')
+            await ctx.send('No race has been created!')
 
     @commands.command(pass_context=True)
     async def unquit(self, ctx):
@@ -394,29 +405,29 @@ class Race(object):
         Only possible if race is started and the racer has previously quit the
         race.
         """
-        racer = ctx.message.author
+        racer = ctx.author
         if self._race_started:
             if racer in self._racer_dict:
                 if self._racer_dict[racer] is None:
-                    await bot.say('<@{}>, you have not completed the race '
-                                  'yet.'.format(racer.id))
-                elif self._racer_dict[racer] is not 'Forfeited':
-                    await bot.say('<@{}>, you never quit the race.'.format(
+                    await ctx.send('<@{}>, you have not completed the race '
+                                   'yet.'.format(racer.id))
+                elif self._racer_dict[racer] != 'Forfeited':
+                    await ctx.send('<@{}>, you never quit the race.'.format(
                         racer.id
                     ))
                 else:
                     self._racer_dict[racer] = None
                     self._num_finished -= 1
                     self._results_printed = False
-                    await bot.say('{} is back in the race!'.format(
+                    await ctx.send('{} is back in the race!'.format(
                         self.trim_member_name('{}'.format(racer))
                     ))
             else:
-                await bot.say("<@{}>, you didn't join the race.".format(
+                await ctx.send("<@{}>, you didn't join the race.".format(
                     racer.id
                 ))
         else:
-            await bot.say('No race currently running!')
+            await ctx.send('No race currently running!')
 
     @commands.command(pass_context=True)
     async def done(self, ctx):
@@ -428,7 +439,7 @@ class Race(object):
 
         Outputs results if everyone has completed the race.
         """
-        racer = ctx.message.author
+        racer = ctx.author
         if self._race_started:
             if racer in self._racer_dict:
                 if self._racer_dict[racer] is None:
@@ -436,7 +447,7 @@ class Race(object):
                     racer_start_time = self._racer_start_times_dict[racer]
                     time_taken = finish_time - racer_start_time
                     finish_msg = '{racer} has finished the race in {time}!'
-                    await bot.say(finish_msg.format(
+                    await ctx.send(finish_msg.format(
                         racer=self.trim_member_name('{}'.format(racer)),
                         time=self.round_time(time_taken)
                     ))
@@ -445,24 +456,24 @@ class Race(object):
                     self._racer_comments_dict[racer] = ''
                     self._num_finished += 1
                     if self._num_finished == self._num_racers:
-                        await bot.say('Everyone has completed the race!')
-                        await self.output_results(True)
+                        await ctx.send('Everyone has completed the race!')
+                        await self.output_results(ctx, True)
                         self._results_printed = True
-                elif self._racer_dict[racer] is 'Forfeited':
-                    await bot.say('<@{}>, you have already left the '
-                                  'race.'.format(racer.id))
-                    await bot.say('Please !undone or !unquit if you want to '
-                                  'rejoin the race.')
+                elif self._racer_dict[racer] == 'Forfeited':
+                    await ctx.send('<@{}>, you have already left the '
+                                   'race.'.format(racer.id))
+                    await ctx.send('Please !undone or !unquit if you want to '
+                                   'rejoin the race.')
                 else:
-                    await bot.say('<@{}>, you have already completed the '
-                                  'race.'.format(racer.id))
-                    await bot.say('Please !undone if you want to undo your '
-                                  'previous race completion.')
+                    await ctx.send('<@{}>, you have already completed the '
+                                   'race.'.format(racer.id))
+                    await ctx.send('Please !undone if you want to undo your '
+                                   'previous race completion.')
             else:
-                await bot.say("<@{}>, you didn't join the "
-                              "race.".format(racer.id))
+                await ctx.send("<@{}>, you didn't join the "
+                               "race.".format(racer.id))
         else:
-            await bot.say('No race currently running!')
+            await ctx.send('No race currently running!')
 
     @commands.command(pass_context=True)
     async def undone(self, ctx):
@@ -471,21 +482,21 @@ class Race(object):
         Only possible if race is started. If the racer has previously quit
         the race, this behaves equivalently to unquit.
         """
-        racer = ctx.message.author
+        racer = ctx.author
         if self._race_started:
             if racer in self._racer_dict:
                 if self._racer_dict[racer] is None:
-                    await bot.say('<@{}>, you have not completed the race '
-                                  'yet.'.format(racer.id))
+                    await ctx.send('<@{}>, you have not completed the race '
+                                   'yet.'.format(racer.id))
                 else:
                     self._racer_dict[racer] = None
                     self._num_finished -= 1
                     self._results_printed = False
-                    await bot.say('{} is back in the race!'.format(
+                    await ctx.send('{} is back in the race!'.format(
                         self.trim_member_name('{}'.format(racer))
                     ))
         else:
-            await bot.say('No race currently running!')
+            await ctx.send('No race currently running!')
 
     @commands.command(pass_context=True)
     async def comment(self, ctx, *, comment_string: str):
@@ -494,26 +505,26 @@ class Race(object):
         Only possible if race is started. Comments are only accepted if a
         person had finished or forfeited a race.
         """
-        racer = ctx.message.author
+        racer = ctx.author
         if self._race_started:
             if racer in self._racer_dict:
                 if self._racer_dict[racer] is None:
-                    await bot.say("<@{}>, you didn't complete the race "
-                                  "yet.".format(racer.id))
-                    await bot.say('Either !done if you finished or !quit if '
-                                  'you wish to forfeit before commenting.')
+                    await ctx.send("<@{}>, you didn't complete the race "
+                                   "yet.".format(racer.id))
+                    await ctx.send('Either !done if you finished or !quit if '
+                                   'you wish to forfeit before commenting.')
                 else:
                     self._racer_comments_dict[racer] = comment_string
                     self._results_printed = False
             else:
-                await bot.say("<@{}>, you didn't join the race.".format(
+                await ctx.send("<@{}>, you didn't join the race.".format(
                     racer.id
                 ))
         else:
-            await bot.say('No race currently running!')
+            await ctx.send('No race currently running!')
 
-    @commands.command()
-    async def time(self):
+    @commands.command(pass_context=True)
+    async def time(self, ctx):
         """Returns the current running time of the race.
 
         Only possible if race is started.
@@ -521,14 +532,14 @@ class Race(object):
         if self._race_started:
             current_time = datetime.utcnow()
             time_taken = current_time - self._time_started
-            await bot.say('Race has been running for {}'.format(
+            await ctx.send('Race has been running for {}'.format(
                 self.round_time(time_taken)
             ))
         else:
-            await bot.say('No race currently running!')
+            await ctx.send('No race currently running!')
 
-    @commands.command()
-    async def entrants(self):
+    @commands.command(pass_context=True)
+    async def entrants(self, ctx):
         """Returns the current list of entrants of the race.
 
         Only possible if race has been started. Does not mention the players.
@@ -547,22 +558,42 @@ class Race(object):
             if racer_list == 'Race entrants:\n':
                 racer_list = 'No entrants yet!'
 
-            await bot.say(racer_list)
+            await ctx.send(racer_list)
         else:
-            await bot.say('No race currently running!')
+            await ctx.send('No race currently running!')
 
-    @commands.command()
-    async def results(self):
+    @commands.command(pass_context=True)
+    async def results(self, ctx):
         """Returns the current results of the race.
 
         Only possible if race is created.
         """
         if self._race_started:
-            await self.output_results(False)
+            await self.output_results(ctx, False)
         else:
-            await bot.say('No race has been created!')
+            if self._race_created:
+                await ctx.send('No race has been started!')
+            else:
+                await ctx.send('No race has been created!')
 
-    async def output_results(self, mention_players):
+    @commands.command(pass_context=True)
+    async def download(self, ctx):
+        """Test downloading all relevant pack info"""
+        all_info = {'attachments': []}
+        print(ctx.message.channel)
+        async for msg in ctx.message.channel.history(limit=10000):
+            if msg.attachments:
+                for attachment in msg.attachments:
+                    all_info['attachments'].append({
+                        'attach_name': attachment.filename,
+                        'attach_url': attachment.url,
+                        'time': msg.created_at.strftime('%Y-%m-%d %H:%M:%S') + ' -0000',
+                        'author': msg.author.name
+                    })
+        with open('demopack_download.yaml', 'w') as out_stream:
+            yaml.dump(all_info, out_stream)
+
+    async def output_results(self, ctx, mention_players):
         """Outputs the results from the race
 
         Results format: 1. racerName racerTime racerComments
@@ -636,7 +667,7 @@ class Race(object):
         )
 
         if results_string:
-            await bot.say(output)
+            await ctx.send(output)
         if file_string:
             with io.open(self._race_file_name, 'w+', encoding='utf8') as \
                     race_file:
@@ -704,7 +735,7 @@ async def on_ready():
     """Prints debug info on startup."""
     print('------')
     print('Username: ' + bot.user.name)
-    print('User ID: ' + bot.user.id)
+    print('User ID: {}'.format(bot.user.id))
     print('------')
 
 
